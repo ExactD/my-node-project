@@ -55,16 +55,27 @@ app.use((req, res, next) => {
 
 // Middleware для перевірки JWT
 const authenticateToken = (req: any, res: Response, next: any) => {
-  const token = req.cookies.token;
+  // 1. Проверяем токен в заголовках
+  const authHeader = req.headers['authorization'];
+  const tokenFromHeader = authHeader && authHeader.split(' ')[1];
+  
+  // 2. Проверяем токен в cookies
+  const tokenFromCookie = req.cookies?.token;
+  
+  const token = tokenFromHeader || tokenFromCookie;
 
   if (!token) {
-    return res.status(401).json({ error: 'Токен доступу відсутній' });
+    console.log('No token provided in request');
+    return res.status(401).json({ error: 'Access token is required' });
   }
 
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
     if (err) {
-      return res.status(403).json({ error: 'Недійсний токен' });
+      console.error('JWT verification failed:', err.message);
+      return res.status(403).json({ error: 'Invalid or expired token' });
     }
+    
+    console.log('Authenticated user:', user.id);
     req.user = user;
     next();
   });
