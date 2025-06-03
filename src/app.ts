@@ -16,8 +16,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const SALT_ROUNDS = 10; // Кількість раундів солювання для bcrypt
 const VERIFICATION_CODE_LENGTH = 6;
 const VERIFICATION_CODE_EXPIRES_MINUTES = 15;
-const serverless = require('serverless-http');
-module.exports.handler = serverless(app);
 
 // Підключення до PostgreSQL
 const pool = new Pool({
@@ -25,6 +23,11 @@ const pool = new Pool({
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
+  port: Number(process.env.DB_PORT),
+  ssl: {
+    rejectUnauthorized: false, // Необхідно для Neon.tech
+  },
+  connectionTimeoutMillis: 5000,
 });
 
 const transporter = nodemailer.createTransport({
@@ -48,7 +51,7 @@ app.use('/test', testRoutes);
 app.use('/progress', progressRoutes);
 
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://my-react-project-theta-orpin.vercel.app/');
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
