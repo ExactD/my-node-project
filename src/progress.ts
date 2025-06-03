@@ -26,12 +26,30 @@ const pool = new Pool({
 app.use(express.json());
 app.use(cookieParser());
 
+const allowedOrigins = [
+  'https://my-react-project-theta-orpin.vercel.app',
+  'https://my-react-project-theta-orpin.vercel.app/'
+];
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://my-react-project-theta-orpin.vercel.app');
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.some(allowed => {
+    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+    const normalizedAllowed = allowed.endsWith('/') ? allowed.slice(0, -1) : allowed;
+    return normalizedOrigin === normalizedAllowed;
+  })) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization'); // Додали Authorization
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
   next();
 });
 
