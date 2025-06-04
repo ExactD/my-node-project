@@ -55,7 +55,7 @@ import cors from 'cors';
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://my-react-project-theta-orpin.vercel.app'
+  'https://my-react-project-8o3p.vercel.app'
 ];
 
 const corsOptions: cors.CorsOptions = {
