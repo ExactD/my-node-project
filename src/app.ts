@@ -78,7 +78,16 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
 
 // Middleware для перевірки JWT
 const authenticateToken = (req: any, res: Response, next: any) => {
-  const token = req.cookies.token;
+  // Спочатку перевіряємо токен в cookies
+  let token = req.cookies.token;
+  
+  // Якщо токена немає в cookies, перевіряємо заголовок Authorization
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7); // Видаляємо "Bearer " з початку
+    }
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Токен доступу відсутній' });
@@ -351,7 +360,6 @@ app.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Користувач вже зареєстрований' });
     }
 
-    // Решта логіки реєстрації залишається без змін
     const userResult = await pool.query(
       'SELECT id, verification_code, verification_code_expires_at FROM users WHERE email = $1',
       [email]
@@ -375,14 +383,8 @@ app.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Невірний код підтвердження' });
     }
 
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ error: 'Користувач вже зареєстрований' });
-    }
-
-    // Хешування пароля
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // Оновлюємо користувача
     const updatedUser = await pool.query(
       `UPDATE users 
        SET name = $1, password = $2, email_verified = true, 
@@ -392,16 +394,29 @@ app.post('/register', async (req: Request, res: Response) => {
       [name, hashedPassword, email]
     );
 
-    // Генерація JWT токена
     const token = jwt.sign(
-      { userId: updatedUser.rows[0].id, email: updatedUser.rows[0].email },
+      { 
+        id: updatedUser.rows[0].id, 
+        email: updatedUser.rows[0].email,
+        name: updatedUser.rows[0].name
+      },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '168h' }
     );
+
+    // Встановлення cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 * 7,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined
+    });
 
     res.status(201).json({
       message: 'Користувач успішно зареєстрований',
-      user: updatedUser.rows[0]
+      user: updatedUser.rows[0],
+      token: token // Повертаємо токен для localStorage
     });
   } catch (error) {
     console.error('Помилка при реєстрації:', error);
@@ -420,7 +435,6 @@ app.post('/login', async (req: Request, res: Response) => {
   }
 
   try {
-    // Отримання користувача з бази даних
     const result = await pool.query(
       'SELECT id, name, email, password, email_verified FROM users WHERE email = $1',
       [email]
@@ -434,14 +448,12 @@ app.post('/login', async (req: Request, res: Response) => {
 
     const user = result.rows[0];
 
-    // Перевірка чи email підтверджений
     if (!user.email_verified) {
       return res.status(403).json({
         error: 'Email не підтверджено. Будь ласка, підтвердіть свій email.'
       });
     }
 
-    // Порівняння пароля з хешем
     const isPasswordValid = await bcrypt.compare(password, user.password);
     
     if (!isPasswordValid) {
@@ -450,7 +462,6 @@ app.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Генерація JWT токена
     const token = jwt.sign(
       { 
         id: user.id, 
@@ -464,18 +475,18 @@ app.post('/login', async (req: Request, res: Response) => {
     // Встановлення cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 24 * 60 * 60 * 1000 * 7,
-      sameSite: 'none',
-      domain: '.vercel.app'
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined
     });
 
-    // Видаляємо пароль з відповіді
     const { password: _, ...userWithoutPassword } = user;
 
     res.json({
       message: 'Успішний вхід',
-      user: userWithoutPassword
+      user: userWithoutPassword,
+      token: token // Повертаємо токен для localStorage
     });
   } catch (err) {
     console.error('Помилка при логіні:', err);

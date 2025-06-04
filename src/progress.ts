@@ -50,7 +50,16 @@ app.use(cors(corsOptions));
 
 // Middleware для перевірки JWT
 const authenticateToken = (req: any, res: Response, next: any) => {
-  const token = req.cookies.token;
+  // Спочатку перевіряємо токен в cookies
+  let token = req.cookies.token;
+  
+  // Якщо токена немає в cookies, перевіряємо заголовок Authorization
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7); // Видаляємо "Bearer " з початку
+    }
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Токен доступу відсутній' });
