@@ -25,9 +25,8 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   port: Number(process.env.DB_PORT),
   ssl: {
-    rejectUnauthorized: false, // Необхідно для Neon.tech
-  },
-  connectionTimeoutMillis: 5000,
+    rejectUnauthorized: false // Увага: це небезпечно для продакшена!
+  }
 });
 
 const transporter = nodemailer.createTransport({
@@ -50,30 +49,21 @@ app.use(cookieParser());
 app.use('/test', testRoutes);
 app.use('/progress', progressRoutes);
 
-const allowedOrigins = [
-  'https://my-react-project-theta-orpin.vercel.app',
-  'https://my-react-project-theta-orpin.vercel.app/'
-];
-
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'https://my-react-project-theta-orpin.vercel.app'
+  ];
+  const origin = req.headers.origin || '';
   
-  if (origin && allowedOrigins.some(allowed => {
-    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
-    const normalizedAllowed = allowed.endsWith('/') ? allowed.slice(0, -1) : allowed;
-    return normalizedOrigin === normalizedAllowed;
-  })) {
+  if (allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   }
   
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
@@ -83,27 +73,16 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
 
 // Middleware для перевірки JWT
 const authenticateToken = (req: any, res: Response, next: any) => {
-  // 1. Проверяем токен в заголовках
-  const authHeader = req.headers['authorization'];
-  const tokenFromHeader = authHeader && authHeader.split(' ')[1];
-  
-  // 2. Проверяем токен в cookies
-  const tokenFromCookie = req.cookies?.token;
-  
-  const token = tokenFromHeader || tokenFromCookie;
+  const token = req.cookies.token;
 
   if (!token) {
-    console.log('No token provided in request');
-    return res.status(401).json({ error: 'Access token is required' });
+    return res.status(401).json({ error: 'Токен доступу відсутній' });
   }
 
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
     if (err) {
-      console.error('JWT verification failed:', err.message);
-      return res.status(403).json({ error: 'Invalid or expired token' });
+      return res.status(403).json({ error: 'Недійсний токен' });
     }
-    
-    console.log('Authenticated user:', user.id);
     req.user = user;
     next();
   });
@@ -415,14 +394,6 @@ app.post('/register', async (req: Request, res: Response) => {
       { expiresIn: '24h' }
     );
 
-    // Встановлення cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production'
-    });
-
     res.status(201).json({
       message: 'Користувач успішно зареєстрований',
       user: updatedUser.rows[0]
@@ -482,15 +453,16 @@ app.post('/login', async (req: Request, res: Response) => {
         name: user.name
       },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '168h' }
     );
 
     // Встановлення cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       maxAge: 24 * 60 * 60 * 1000 * 7,
-      sameSite: 'strict'
+      sameSite: 'none',
+      domain: '.vercel.app'
     });
 
     // Видаляємо пароль з відповіді
