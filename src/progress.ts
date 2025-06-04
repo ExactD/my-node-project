@@ -28,7 +28,7 @@ app.use(cookieParser());
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://my-react-project-theta-orpin.vercel.app'
+  'https://vercel.com/exactds-projects/my-react-project-8o3p'
 ];
 
 const corsOptions: cors.CorsOptions = {
