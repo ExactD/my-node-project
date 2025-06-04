@@ -28,7 +28,7 @@ app.use(cookieParser());
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://vercel.com/exactds-projects/my-react-project-8o3p'
+  'https://my-react-project-8o3p.vercel.app'
 ];
 
 const corsOptions: cors.CorsOptions = {
