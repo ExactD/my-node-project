@@ -32,8 +32,12 @@ const pool = new Pool({
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER || 'nazarcukmihajlo9@gmail.com', // default для dev mode
-    pass: process.env.EMAIL_PASSWORD || 'ymqf qhtm lzjv pzto',
+    type: 'OAuth2',
+    user: process.env.EMAIL_USER,
+    clientId: process.env.OAUTH_CLIENTID,
+    clientSecret: process.env.OAUTH_CLIENT_SECRET,
+    refreshToken: process.env.OAUTH_REFRESH_TOKEN,
+    accessToken: process.env.OAUTH_ACCESS_TOKEN,
   },
 });
 
