@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import cors from 'cors';
 
 dotenv.config();
 
@@ -25,23 +26,27 @@ const pool = new Pool({
 app.use(express.json());
 app.use(cookieParser());
 
-app.use((req, res, next) => {
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'https://my-react-project-theta-orpin.vercel.app'
-  ];
-  const origin = req.headers.origin || '';
-  
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-  next();
-});
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://my-react-project-theta-orpin.vercel.app'
+];
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Дозволити запити без origin (наприклад, Postman) або з дозволених сайтів
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+
 
 // Middleware для перевірки JWT
 const authenticateToken = (req: any, res: Response, next: any) => {

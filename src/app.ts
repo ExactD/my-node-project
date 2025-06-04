@@ -48,24 +48,29 @@ app.use(express.json());
 app.use(cookieParser());
 app.use('/test', testRoutes);
 app.use('/progress', progressRoutes);
+import cors from 'cors';
 
-app.use((req, res, next) => {
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'https://my-react-project-theta-orpin.vercel.app'
-  ];
-  const origin = req.headers.origin || '';
-  
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-  next();
-});
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://my-react-project-theta-orpin.vercel.app'
+];
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Дозволити запити без origin (наприклад, Postman) або з дозволених сайтів
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+
 
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
   console.warn('EMAIL_USER або EMAIL_PASSWORD не встановлені в .env файлі. В режимі розробки коди будуть показуватись у консолі.');
