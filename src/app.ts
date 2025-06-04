@@ -461,7 +461,7 @@ app.post('/login', async (req: Request, res: Response) => {
       secure: true,
       maxAge: 24 * 60 * 60 * 1000 * 7,
       sameSite: 'none',
-      domain: '.vercel.app'
+      domain: ''
       //domain: '.vercel.app'
     });
 
