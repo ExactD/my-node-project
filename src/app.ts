@@ -32,12 +32,11 @@ const pool = new Pool({
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    type: 'OAuth2',
-    user: process.env.EMAIL_USER,
-    clientId: process.env.OAUTH_CLIENTID,
-    clientSecret: process.env.OAUTH_CLIENT_SECRET,
-    refreshToken: process.env.OAUTH_REFRESH_TOKEN,
-    accessToken: process.env.OAUTH_ACCESS_TOKEN,
+    user: process.env.EMAIL_USER || 'nazarcukmihajlo9@gmail.com', // Ваш Gmail
+    pass: process.env.EMAIL_PASSWORD || 'yyba psvo xwvx xrvk', // Пароль додатку
+  },
+  tls: {
+    rejectUnauthorized: false, // Іноді потрібно для локального тестування
   },
 });
 
@@ -56,7 +55,7 @@ import cors from 'cors';
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://my-react-project-8o3p.vercel.app'
+  'https://my-react-project-theta-orpin.vercel.app'
 ];
 
 const corsOptions: cors.CorsOptions = {
@@ -82,16 +81,7 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
 
 // Middleware для перевірки JWT
 const authenticateToken = (req: any, res: Response, next: any) => {
-  // Спочатку перевіряємо токен в cookies
-  let token = req.cookies.token;
-  
-  // Якщо токена немає в cookies, перевіряємо заголовок Authorization
-  if (!token) {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7); // Видаляємо "Bearer " з початку
-    }
-  }
+  const token = req.cookies.token;
 
   if (!token) {
     return res.status(401).json({ error: 'Токен доступу відсутній' });
@@ -109,7 +99,6 @@ const authenticateToken = (req: any, res: Response, next: any) => {
 // Тимчасове сховище для кодів підтвердження (в продакшені використовуйте Redis або БД)
 const emailVerificationCodes = new Map<string, VerificationData>();
 
-// Генерація та відправка коду підтвердження
 app.post('/send-verification-code', async (req: Request, res: Response) => {
   const { email } = req.body;
 
@@ -122,7 +111,6 @@ app.post('/send-verification-code', async (req: Request, res: Response) => {
   }
 
   try {
-    // Спочатку перевіряємо, чи є вже дійсний код
     const userResult = await pool.query(
       'SELECT verification_code, verification_code_expires_at FROM users WHERE email = $1',
       [email]
@@ -131,26 +119,22 @@ app.post('/send-verification-code', async (req: Request, res: Response) => {
     let verificationCode: string;
     let expiresAt: Date;
 
-    if (userResult.rows.length > 0 && 
-        userResult.rows[0].verification_code && 
-        new Date(userResult.rows[0].verification_code_expires_at) > new Date()) {
-      // Використовуємо існуючий код
+    if (userResult.rows.length > 0 &&
+      userResult.rows[0].verification_code &&
+      new Date(userResult.rows[0].verification_code_expires_at) > new Date()
+    ) {
       verificationCode = userResult.rows[0].verification_code;
       expiresAt = userResult.rows[0].verification_code_expires_at;
     } else {
-      // Генеруємо новий код
       verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       expiresAt = new Date(Date.now() + VERIFICATION_CODE_EXPIRES_MINUTES * 60 * 1000);
 
-      // Зберігаємо код у базі
       if (userResult.rows.length > 0) {
-        // Оновлюємо існуючого користувача
         await pool.query(
           'UPDATE users SET verification_code = $1, verification_code_expires_at = $2 WHERE email = $3',
           [verificationCode, expiresAt, email]
         );
       } else {
-        // Створюємо новий запис
         await pool.query(
           'INSERT INTO users (email, verification_code, verification_code_expires_at) VALUES ($1, $2, $3)',
           [email, verificationCode, expiresAt]
@@ -159,40 +143,44 @@ app.post('/send-verification-code', async (req: Request, res: Response) => {
     }
 
     // Відправка email
-    if (process.env.NODE_ENV === 'production' && process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
-      try {
-        await transporter.sendMail({
+    try {
+      await transporter.sendMail({
           from: `"Тестування знань" <${process.env.EMAIL_USER}>`,
           to: email,
-          subject: 'Код підтвердження email',
-          text: `Ваш код підтвердження: ${verificationCode}`,
-          html: `<p>Ваш код підтвердження: <strong>${verificationCode}</strong></p>
-                 <p>Код дійсний протягом ${VERIFICATION_CODE_EXPIRES_MINUTES} хвилин.</p>`,
-        });
-        console.log(`Код підтвердження відправлено на ${email}`);
-      } catch (mailError) {
-        console.error('Помилка при відправці email:', mailError);
-        return res.status(500).json({ 
-          error: 'Помилка при відправці коду підтвердження'
-        });
-      }
-    } else {
-      console.log(`[DEV] Код підтвердження для ${email}: ${verificationCode}`);
-      console.log(`[DEV] Код дійсний до: ${expiresAt}`);
-    }
+          subject: 'Підтвердження email',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Підтвердження email</h2>
+              <p>Дякуємо за реєстрацію! Ваш код підтвердження:</p>
+              <div style="background: #f3f4f6; padding: 16px; text-align: center; margin: 16px 0; font-size: 24px; font-weight: bold;">
+                ${verificationCode}
+              </div>
 
-    res.json({
-      message: process.env.NODE_ENV === 'production' 
-        ? 'Код підтвердження відправлено на ваш email' 
-        : 'Код підтвердження доступний у консолі (dev mode)',
-      devCode: process.env.NODE_ENV !== 'production' ? verificationCode : undefined,
-    });
+              <p>Посилання дійсне протягом ${VERIFICATION_CODE_EXPIRES_MINUTES} хвилин.</p>
+              <p style="color: #6b7280; font-size: 14px;">Якщо ви не реєструвалися на нашому сайті, проігноруйте цей лист.</p>
+            </div>
+          `,
+          text: `Ваш код підтвердження: ${verificationCode}\n`
+        });
+
+      return res.status(200).json({
+        message: process.env.NODE_ENV === 'production'
+          ? 'Код підтвердження відправлено на ваш email'
+          : 'Код підтвердження доступний у консолі (dev mode)',
+        devCode: process.env.NODE_ENV !== 'production' ? verificationCode : undefined,
+      });
+
+    } catch (error) {
+      console.error('Помилка надсилання листа:', error);
+      return res.status(500).json({ message: 'Помилка при надсиланні листа' });
+    }
 
   } catch (error) {
     console.error('Помилка при генерації коду:', error);
-    res.status(500).json({ error: 'Помилка сервера' });
+    return res.status(500).json({ error: 'Помилка сервера' });
   }
 });
+
 
 // Перевірка коду
 app.post('/verify-email-code', async (req: Request, res: Response) => {
@@ -364,6 +352,7 @@ app.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Користувач вже зареєстрований' });
     }
 
+    // Решта логіки реєстрації залишається без змін
     const userResult = await pool.query(
       'SELECT id, verification_code, verification_code_expires_at FROM users WHERE email = $1',
       [email]
@@ -387,8 +376,14 @@ app.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Невірний код підтвердження' });
     }
 
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'Користувач вже зареєстрований' });
+    }
+
+    // Хешування пароля
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
+    // Оновлюємо користувача
     const updatedUser = await pool.query(
       `UPDATE users 
        SET name = $1, password = $2, email_verified = true, 
@@ -398,29 +393,16 @@ app.post('/register', async (req: Request, res: Response) => {
       [name, hashedPassword, email]
     );
 
+    // Генерація JWT токена
     const token = jwt.sign(
-      { 
-        id: updatedUser.rows[0].id, 
-        email: updatedUser.rows[0].email,
-        name: updatedUser.rows[0].name
-      },
+      { userId: updatedUser.rows[0].id, email: updatedUser.rows[0].email },
       JWT_SECRET,
-      { expiresIn: '168h' }
+      { expiresIn: '24h' }
     );
-
-    // Встановлення cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 24 * 60 * 60 * 1000 * 7,
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined
-    });
 
     res.status(201).json({
       message: 'Користувач успішно зареєстрований',
-      user: updatedUser.rows[0],
-      token: token // Повертаємо токен для localStorage
+      user: updatedUser.rows[0]
     });
   } catch (error) {
     console.error('Помилка при реєстрації:', error);
@@ -439,6 +421,7 @@ app.post('/login', async (req: Request, res: Response) => {
   }
 
   try {
+    // Отримання користувача з бази даних
     const result = await pool.query(
       'SELECT id, name, email, password, email_verified FROM users WHERE email = $1',
       [email]
@@ -452,12 +435,14 @@ app.post('/login', async (req: Request, res: Response) => {
 
     const user = result.rows[0];
 
+    // Перевірка чи email підтверджений
     if (!user.email_verified) {
       return res.status(403).json({
         error: 'Email не підтверджено. Будь ласка, підтвердіть свій email.'
       });
     }
 
+    // Порівняння пароля з хешем
     const isPasswordValid = await bcrypt.compare(password, user.password);
     
     if (!isPasswordValid) {
@@ -466,6 +451,7 @@ app.post('/login', async (req: Request, res: Response) => {
       });
     }
 
+    // Генерація JWT токена
     const token = jwt.sign(
       { 
         id: user.id, 
@@ -479,18 +465,18 @@ app.post('/login', async (req: Request, res: Response) => {
     // Встановлення cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       maxAge: 24 * 60 * 60 * 1000 * 7,
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined
+      sameSite: 'none',
+      domain: '.vercel.app'
     });
 
+    // Видаляємо пароль з відповіді
     const { password: _, ...userWithoutPassword } = user;
 
     res.json({
       message: 'Успішний вхід',
-      user: userWithoutPassword,
-      token: token // Повертаємо токен для localStorage
+      user: userWithoutPassword
     });
   } catch (err) {
     console.error('Помилка при логіні:', err);
