@@ -393,13 +393,6 @@ app.post('/register', async (req: Request, res: Response) => {
       [name, hashedPassword, email]
     );
 
-    // Генерація JWT токена
-    const token = jwt.sign(
-      { userId: updatedUser.rows[0].id, email: updatedUser.rows[0].email },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
     res.status(201).json({
       message: 'Користувач успішно зареєстрований',
       user: updatedUser.rows[0]
@@ -469,6 +462,7 @@ app.post('/login', async (req: Request, res: Response) => {
       maxAge: 24 * 60 * 60 * 1000 * 7,
       sameSite: 'none',
       domain: '.vercel.app'
+      //domain: '.vercel.app'
     });
 
     // Видаляємо пароль з відповіді
