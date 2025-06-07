@@ -55,7 +55,7 @@ import cors from 'cors';
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://my-react-project-8o3p.vercel.app'
+  'https://prep-react-jade.vercel.app'
 ];
 
 const corsOptions: cors.CorsOptions = {
